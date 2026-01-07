@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { ReturnDetailSkeleton } from '@/components/skeletons';
 
 export default function ReturnDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,11 +23,7 @@ export default function ReturnDetail() {
   const { data: marketplaces = [] } = useMarketplaces();
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Carregando detalhes...</div>
-      </div>
-    );
+    return <ReturnDetailSkeleton />;
   }
 
   if (!returnData) {

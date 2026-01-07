@@ -18,6 +18,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/formatters';
+import { DashboardSkeleton } from '@/components/skeletons';
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -169,11 +170,7 @@ export default function Dashboard() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Carregando dados...</div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
