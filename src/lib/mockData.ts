@@ -1,0 +1,87 @@
+export interface Marketplace {
+  id: string;
+  name: string;
+  logo: string;
+  active: boolean;
+}
+
+export interface Return {
+  id: string;
+  order_id: string;
+  marketplace_id: string;
+  customer_name: string;
+  customer_email: string;
+  product_name: string;
+  product_sku: string;
+  product_category: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'processing' | 'completed';
+  value: number;
+  created_at: string;
+  updated_at: string;
+  tracking_code?: string;
+  notes?: string;
+}
+
+export const marketplaces: Marketplace[] = [
+  { id: '1', name: 'Mercado Livre', logo: 'mercadolivre', active: true },
+  { id: '2', name: 'Amazon', logo: 'amazon', active: true },
+  { id: '3', name: 'Shopee', logo: 'shopee', active: true },
+  { id: '4', name: 'Magalu', logo: 'magalu', active: true },
+  { id: '5', name: 'Site Próprio', logo: 'site', active: true },
+];
+
+// Dados realistas simulando APIs de marketplaces
+export const mockReturns: Return[] = [
+  // Mercado Livre - formato ML-
+  { id: '1', order_id: 'ML-2024-15847', marketplace_id: '1', customer_name: 'Maria Silva Santos', customer_email: 'maria.silva@gmail.com', product_name: 'Óleo de Coco Orgânico Extra Virgem 500ml', product_sku: 'OC-500-ORG', product_category: 'Óleos Naturais', reason: 'Produto com defeito', status: 'pending', value: 89.90, created_at: '2024-11-12T10:30:00Z', updated_at: '2024-11-12T10:30:00Z' },
+  { id: '2', order_id: 'ML-2024-15923', marketplace_id: '1', customer_name: 'João Pedro Costa', customer_email: 'joao.costa@hotmail.com', product_name: 'Pasta de Amendoim Integral 1kg', product_sku: 'PA-1000-INT', product_category: 'Pastas', reason: 'Produto diferente do anunciado', status: 'approved', value: 45.50, created_at: '2024-11-11T14:20:00Z', updated_at: '2024-11-11T16:45:00Z', tracking_code: 'BR123456789BR' },
+  { id: '3', order_id: 'ML-2024-16001', marketplace_id: '1', customer_name: 'Ana Paula Oliveira', customer_email: 'ana.oliveira@yahoo.com', product_name: 'Mix de Castanhas Premium 500g', product_sku: 'MC-500-PRE', product_category: 'Castanhas', reason: 'Arrependimento', status: 'processing', value: 65.00, created_at: '2024-11-10T09:15:00Z', updated_at: '2024-11-10T11:30:00Z', tracking_code: 'BR987654321BR' },
+  { id: '4', order_id: 'ML-2024-16089', marketplace_id: '1', customer_name: 'Carlos Eduardo Lima', customer_email: 'carlos.lima@outlook.com', product_name: 'Whey Protein Natural 900g', product_sku: 'WP-900-NAT', product_category: 'Suplementos', reason: 'Produto com validade curta', status: 'rejected', value: 125.00, created_at: '2024-11-09T16:40:00Z', updated_at: '2024-11-09T18:20:00Z' },
+  { id: '5', order_id: 'ML-2024-16145', marketplace_id: '1', customer_name: 'Juliana Ferreira', customer_email: 'ju.ferreira@gmail.com', product_name: 'Granola Artesanal 1kg', product_sku: 'GR-1000-ART', product_category: 'Cereais', reason: 'Embalagem violada', status: 'completed', value: 38.90, created_at: '2024-11-08T08:00:00Z', updated_at: '2024-11-08T20:00:00Z' },
+
+  // Amazon - formato AMZ-BR-
+  { id: '6', order_id: 'AMZ-BR-2024-789456', marketplace_id: '2', customer_name: 'Roberto Alves', customer_email: 'roberto.alves@gmail.com', product_name: 'Mel Orgânico de Abelhas Nativas 500g', product_sku: 'ME-500-ORG', product_category: 'Adoçantes Naturais', reason: 'Prazo de entrega excedido', status: 'pending', value: 55.00, created_at: '2024-11-13T11:00:00Z', updated_at: '2024-11-13T11:00:00Z' },
+  { id: '7', order_id: 'AMZ-BR-2024-789523', marketplace_id: '2', customer_name: 'Patricia Mendes', customer_email: 'patricia.m@hotmail.com', product_name: 'Açúcar de Coco 300g', product_sku: 'AC-300-NAT', product_category: 'Adoçantes Naturais', reason: 'Arrependimento', status: 'approved', value: 28.50, created_at: '2024-11-12T13:30:00Z', updated_at: '2024-11-12T15:00:00Z', tracking_code: 'AMZBR12345' },
+  { id: '8', order_id: 'AMZ-BR-2024-789601', marketplace_id: '2', customer_name: 'Fernando Santos', customer_email: 'fernando.s@outlook.com', product_name: 'Chia Seeds Premium 500g', product_sku: 'CS-500-PRE', product_category: 'Sementes', reason: 'Produto com defeito', status: 'processing', value: 42.00, created_at: '2024-11-11T10:00:00Z', updated_at: '2024-11-11T12:00:00Z', tracking_code: 'AMZBR67890' },
+  { id: '9', order_id: 'AMZ-BR-2024-789678', marketplace_id: '2', customer_name: 'Larissa Costa', customer_email: 'larissa.costa@gmail.com', product_name: 'Quinoa Branca em Grãos 500g', product_sku: 'QB-500-GRA', product_category: 'Grãos', reason: 'Produto diferente do anunciado', status: 'approved', value: 35.90, created_at: '2024-11-10T09:30:00Z', updated_at: '2024-11-10T14:30:00Z', tracking_code: 'AMZBR24680' },
+  { id: '10', order_id: 'AMZ-BR-2024-789745', marketplace_id: '2', customer_name: 'Ricardo Souza', customer_email: 'ricardo.souza@yahoo.com', product_name: 'Proteína de Ervilha Vegana 1kg', product_sku: 'PE-1000-VEG', product_category: 'Suplementos', reason: 'Embalagem danificada', status: 'completed', value: 95.00, created_at: '2024-11-09T12:00:00Z', updated_at: '2024-11-09T18:00:00Z' },
+
+  // Shopee - formato SHP-
+  { id: '11', order_id: 'SHP-2024-5547812', marketplace_id: '3', customer_name: 'Camila Rodrigues', customer_email: 'camila.r@gmail.com', product_name: 'Cacau em Pó 100% Puro 250g', product_sku: 'CA-250-PUR', product_category: 'Cacau', reason: 'Produto com defeito', status: 'pending', value: 32.90, created_at: '2024-11-13T15:20:00Z', updated_at: '2024-11-13T15:20:00Z' },
+  { id: '12', order_id: 'SHP-2024-5548001', marketplace_id: '3', customer_name: 'Lucas Martins', customer_email: 'lucas.m@hotmail.com', product_name: 'Flocos de Aveia Integral 1kg', product_sku: 'AV-1000-INT', product_category: 'Cereais', reason: 'Arrependimento', status: 'approved', value: 24.90, created_at: '2024-11-12T08:45:00Z', updated_at: '2024-11-12T10:15:00Z', tracking_code: 'SPXBR123456' },
+  { id: '13', order_id: 'SHP-2024-5548189', marketplace_id: '3', customer_name: 'Beatriz Lopes', customer_email: 'beatriz.lopes@outlook.com', product_name: 'Linhaça Dourada Moída 500g', product_sku: 'LI-500-DOU', product_category: 'Sementes', reason: 'Produto diferente do anunciado', status: 'processing', value: 18.50, created_at: '2024-11-11T13:20:00Z', updated_at: '2024-11-11T15:40:00Z', tracking_code: 'SPXBR789012' },
+  { id: '14', order_id: 'SHP-2024-5548267', marketplace_id: '3', customer_name: 'Gabriel Silva', customer_email: 'gabriel.silva@gmail.com', product_name: 'Óleo de Coco Extra Virgem 500ml', product_sku: 'OC-500-ORG', product_category: 'Óleos Naturais', reason: 'Embalagem violada', status: 'rejected', value: 89.90, created_at: '2024-11-10T16:30:00Z', updated_at: '2024-11-10T17:45:00Z' },
+  { id: '15', order_id: 'SHP-2024-5548334', marketplace_id: '3', customer_name: 'Amanda Pereira', customer_email: 'amanda.p@yahoo.com', product_name: 'Castanha de Caju Torrada 250g', product_sku: 'CC-250-TOR', product_category: 'Castanhas', reason: 'Produto com defeito', status: 'completed', value: 48.00, created_at: '2024-11-09T10:15:00Z', updated_at: '2024-11-09T19:30:00Z' },
+
+  // Magazine Luiza - formato MG-
+  { id: '16', order_id: 'MG-2024-334512', marketplace_id: '4', customer_name: 'Thiago Ribeiro', customer_email: 'thiago.ribeiro@gmail.com', product_name: 'Amêndoas Naturais 200g', product_sku: 'AM-200-NAT', product_category: 'Castanhas', reason: 'Prazo de entrega excedido', status: 'pending', value: 52.90, created_at: '2024-11-13T09:10:00Z', updated_at: '2024-11-13T09:10:00Z' },
+  { id: '17', order_id: 'MG-2024-334589', marketplace_id: '4', customer_name: 'Mariana Costa', customer_email: 'mariana.costa@hotmail.com', product_name: 'Farinha de Coco 500g', product_sku: 'FC-500-NAT', product_category: 'Farinhas', reason: 'Arrependimento', status: 'approved', value: 28.90, created_at: '2024-11-12T11:25:00Z', updated_at: '2024-11-12T13:50:00Z', tracking_code: 'MGLU123456' },
+  { id: '18', order_id: 'MG-2024-334667', marketplace_id: '4', customer_name: 'Paulo Henrique', customer_email: 'paulo.h@outlook.com', product_name: 'Pasta de Amendoim Crocante 1kg', product_sku: 'PA-1000-CRO', product_category: 'Pastas', reason: 'Produto com defeito', status: 'processing', value: 48.50, created_at: '2024-11-11T14:35:00Z', updated_at: '2024-11-11T16:20:00Z', tracking_code: 'MGLU789012' },
+  { id: '19', order_id: 'MG-2024-334745', marketplace_id: '4', customer_name: 'Daniela Almeida', customer_email: 'daniela.almeida@gmail.com', product_name: 'Colágeno Hidrolisado 300g', product_sku: 'CO-300-HID', product_category: 'Suplementos', reason: 'Produto diferente do anunciado', status: 'approved', value: 78.90, created_at: '2024-11-10T08:50:00Z', updated_at: '2024-11-10T15:10:00Z', tracking_code: 'MGLU345678' },
+  { id: '20', order_id: 'MG-2024-334823', marketplace_id: '4', customer_name: 'Rodrigo Barbosa', customer_email: 'rodrigo.b@yahoo.com', product_name: 'Granola Zero Açúcar 1kg', product_sku: 'GR-1000-ZER', product_category: 'Cereais', reason: 'Embalagem danificada', status: 'completed', value: 42.00, created_at: '2024-11-09T13:20:00Z', updated_at: '2024-11-09T20:45:00Z' },
+
+  // Site Próprio - formato WEB-
+  { id: '21', order_id: 'WEB-2024-000145', marketplace_id: '5', customer_name: 'Isabela Martins', customer_email: 'isabela.m@gmail.com', product_name: 'Kit Café da Manhã Saudável', product_sku: 'KIT-001-CAF', product_category: 'Kits', reason: 'Produto com defeito', status: 'pending', value: 156.90, created_at: '2024-11-13T10:45:00Z', updated_at: '2024-11-13T10:45:00Z' },
+  { id: '22', order_id: 'WEB-2024-000152', marketplace_id: '5', customer_name: 'Bruno Araújo', customer_email: 'bruno.araujo@hotmail.com', product_name: 'Azeite Extra Virgem Premium 500ml', product_sku: 'AZ-500-PRE', product_category: 'Óleos Naturais', reason: 'Arrependimento', status: 'approved', value: 68.00, created_at: '2024-11-12T15:10:00Z', updated_at: '2024-11-12T17:35:00Z', tracking_code: 'DNA123456BR' },
+  { id: '23', order_id: 'WEB-2024-000159', marketplace_id: '5', customer_name: 'Carla Mendes', customer_email: 'carla.mendes@outlook.com', product_name: 'Geleia de Frutas Vermelhas 250g', product_sku: 'GE-250-FRU', product_category: 'Geleias', reason: 'Produto diferente do anunciado', status: 'processing', value: 22.90, created_at: '2024-11-11T09:25:00Z', updated_at: '2024-11-11T11:50:00Z', tracking_code: 'DNA789012BR' },
+  { id: '24', order_id: 'WEB-2024-000166', marketplace_id: '5', customer_name: 'Eduardo Santos', customer_email: 'eduardo.santos@gmail.com', product_name: 'Whey Protein Vegano 900g', product_sku: 'WP-900-VEG', product_category: 'Suplementos', reason: 'Embalagem violada', status: 'rejected', value: 135.00, created_at: '2024-11-10T12:40:00Z', updated_at: '2024-11-10T14:15:00Z' },
+  { id: '25', order_id: 'WEB-2024-000173', marketplace_id: '5', customer_name: 'Fernanda Lima', customer_email: 'fernanda.lima@yahoo.com', product_name: 'Castanha do Pará 300g', product_sku: 'CP-300-NAT', product_category: 'Castanhas', reason: 'Prazo de entrega excedido', status: 'completed', value: 42.50, created_at: '2024-11-09T11:30:00Z', updated_at: '2024-11-09T21:00:00Z' },
+
+  // Mais devoluções variadas
+  { id: '26', order_id: 'ML-2024-16234', marketplace_id: '1', customer_name: 'Vinícius Rocha', customer_email: 'vinicius.rocha@gmail.com', product_name: 'Óleo de Coco Extra Virgem 500ml', product_sku: 'OC-500-ORG', product_category: 'Óleos Naturais', reason: 'Produto com defeito', status: 'pending', value: 89.90, created_at: '2024-11-08T14:20:00Z', updated_at: '2024-11-08T14:20:00Z' },
+  { id: '27', order_id: 'AMZ-BR-2024-789834', marketplace_id: '2', customer_name: 'Sofia Ferreira', customer_email: 'sofia.f@hotmail.com', product_name: 'Quinoa Mix Colorida 500g', product_sku: 'QM-500-COL', product_category: 'Grãos', reason: 'Arrependimento', status: 'approved', value: 38.50, created_at: '2024-11-07T09:15:00Z', updated_at: '2024-11-07T11:40:00Z', tracking_code: 'AMZBR13579' },
+  { id: '28', order_id: 'SHP-2024-5548456', marketplace_id: '3', customer_name: 'Henrique Dias', customer_email: 'henrique.dias@outlook.com', product_name: 'Pasta de Amendoim Integral 1kg', product_sku: 'PA-1000-INT', product_category: 'Pastas', reason: 'Produto diferente do anunciado', status: 'processing', value: 45.50, created_at: '2024-11-06T16:50:00Z', updated_at: '2024-11-06T18:25:00Z', tracking_code: 'SPXBR246810' },
+  { id: '29', order_id: 'MG-2024-334901', marketplace_id: '4', customer_name: 'Aline Cardoso', customer_email: 'aline.cardoso@gmail.com', product_name: 'Granola com Frutas 1kg', product_sku: 'GR-1000-FRU', product_category: 'Cereais', reason: 'Embalagem danificada', status: 'approved', value: 40.90, created_at: '2024-11-05T10:30:00Z', updated_at: '2024-11-05T16:20:00Z', tracking_code: 'MGLU901234' },
+  { id: '30', order_id: 'WEB-2024-000180', marketplace_id: '5', customer_name: 'Marcelo Gomes', customer_email: 'marcelo.gomes@yahoo.com', product_name: 'Mix de Sementes 500g', product_sku: 'MS-500-MIX', product_category: 'Sementes', reason: 'Produto com validade curta', status: 'completed', value: 32.00, created_at: '2024-11-04T13:45:00Z', updated_at: '2024-11-04T22:10:00Z' },
+];
+
+export const getMarketplaceName = (id: string): string => {
+  const marketplace = marketplaces.find(m => m.id === id);
+  return marketplace?.name || 'Desconhecido';
+};
+
+export const getMarketplaceLogo = (id: string): string => {
+  const marketplace = marketplaces.find(m => m.id === id);
+  return marketplace?.logo || '❓';
+};
