@@ -10,6 +10,7 @@ import { useMarketplaces } from '@/hooks/useMarketplaces';
 import { getMarketplaceName } from '@/hooks/useMarketplaceLogos';
 import { MarketplaceLogo } from '@/components/MarketplaceLogo';
 import { Link } from 'react-router-dom';
+import { ReturnsSkeleton } from '@/components/skeletons';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -91,11 +92,7 @@ export default function Returns() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Carregando devoluções...</div>
-      </div>
-    );
+    return <ReturnsSkeleton />;
   }
 
   return (

@@ -6,6 +6,7 @@ import { useMarketplaces } from '@/hooks/useMarketplaces';
 import { getMarketplaceName } from '@/hooks/useMarketplaceLogos';
 import { MarketplaceLogo } from '@/components/MarketplaceLogo';
 import { useMemo } from 'react';
+import { AnalyticsSkeleton } from '@/components/skeletons';
 
 export default function Analytics() {
   const { data: returns = [], isLoading } = useReturns();
@@ -96,11 +97,7 @@ export default function Analytics() {
   }, [returns, marketplaces]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Carregando análises...</div>
-      </div>
-    );
+    return <AnalyticsSkeleton />;
   }
 
   return (
