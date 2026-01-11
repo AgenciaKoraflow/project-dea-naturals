@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,13 +7,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Eye, EyeOff, Check, X } from "lucide-react";
+import { Eye, EyeOff, Check, X, ExternalLink } from "lucide-react";
 import { Marketplace } from "@/lib/mockData";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
+import { useMercadoLivreCredentials } from "@/hooks/useMercadoLivreCredentials";
+import { useToast } from "@/hooks/use-toast";
 
 export interface MarketplaceConfig {
   apiKey: string;
@@ -61,16 +72,10 @@ const marketplaceFields: Record<
       placeholder: "Sua chave secreta do ML",
     },
     {
-      label: "Authorization Code",
-      key: "authorizationCode",
-      required: true,
-      placeholder: "Código de autenticação",
-    },
-    {
       label: "URI de Redirecionamento",
       key: "redirectUri",
       required: true,
-      placeholder: "Código de autenticação",
+      placeholder: "https://seu-app.com/callback",
     },
   ],
 };
@@ -96,14 +101,54 @@ export function MarketplaceConfigDialog({
   config,
   onSave,
 }: MarketplaceConfigDialogProps) {
+  const { credentials, saveCredentials, testConnection, isSaving, isTesting } =
+    useMercadoLivreCredentials();
+  const { toast } = useToast();
   const [formData, setFormData] = useState<MarketplaceConfig>(
     config || defaultConfig
   );
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
-  const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "error" | null>(
     null
   );
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [oauthStep, setOauthStep] = useState<"credentials" | "authorization">(
+    "credentials"
+  );
+
+  // Função helper para extrair mensagem de erro do axios
+  const getErrorMessage = (error: unknown, defaultMessage: string): string => {
+    if (
+      error &&
+      typeof error === "object" &&
+      "response" in error &&
+      error.response &&
+      typeof error.response === "object" &&
+      "data" in error.response &&
+      error.response.data &&
+      typeof error.response.data === "object" &&
+      "message" in error.response.data &&
+      typeof error.response.data.message === "string"
+    ) {
+      return error.response.data.message;
+    }
+    return defaultMessage;
+  };
+
+  // Carrega credenciais do banco quando o diálogo abre
+  useEffect(() => {
+    if (open && marketplace?.name === "Mercado Livre" && credentials) {
+      setFormData((prev) => ({
+        ...prev,
+        clientId: credentials.client_id || prev.clientId,
+        redirectUri: credentials.redirect_uri || prev.redirectUri,
+        enabled: credentials.is_active || prev.enabled,
+      }));
+      setOauthStep(
+        credentials.oauth_completed ? "credentials" : "authorization"
+      );
+    }
+  }, [open, credentials, marketplace]);
 
   if (!marketplace) return null;
 
@@ -122,24 +167,116 @@ export function MarketplaceConfigDialog({
     setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-
-    // Simulação de teste de conexão
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Simular sucesso se todos os campos obrigatórios estiverem preenchidos
-    const requiredFields = fields.filter((f) => f.required);
-    const allFilled = requiredFields.every((f) => formData[f.key]);
-
-    setTestResult(allFilled ? "success" : "error");
-    setIsTesting(false);
+  // Gera URL de autorização do Mercado Livre
+  const getAuthorizationUrl = () => {
+    const clientId = formData.clientId;
+    const redirectUri = encodeURIComponent(formData.redirectUri);
+    return `https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}`;
   };
 
-  const handleSave = () => {
-    onSave(formData);
-    onOpenChange(false);
+  const handleSaveCredentials = async () => {
+    if (!formData.clientId || !formData.clientSecret || !formData.redirectUri) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await saveCredentials({
+        clientId: formData.clientId,
+        clientSecret: formData.clientSecret,
+        redirectUri: formData.redirectUri,
+      });
+
+      toast({
+        title: "Sucesso",
+        description: "Credenciais salvas com sucesso!",
+      });
+
+      setOauthStep("authorization");
+      setTestResult(null);
+      setShowSaveConfirm(false);
+      onSave({ ...formData });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro",
+        description: getErrorMessage(error, "Erro ao salvar credenciais"),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmSaveCredentials = async () => {
+    setShowSaveConfirm(true);
+  };
+
+  const handleContinueConfig = async () => {
+    if (!formData.clientId || !formData.clientSecret || !formData.redirectUri) {
+      toast({
+        title: "Erro",
+        description: "Preencha todos os campos obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await saveCredentials({
+        clientId: formData.clientId,
+        clientSecret: formData.clientSecret,
+        redirectUri: formData.redirectUri,
+      });
+
+      setOauthStep("authorization");
+      setTestResult(null);
+    } catch (error: unknown) {
+      toast({
+        title: "Erro",
+        description: getErrorMessage(error, "Erro ao salvar credenciais"),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!formData.authorizationCode) {
+      toast({
+        title: "Erro",
+        description: "Você precisa fornecer o código de autorização",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const result = await testConnection(formData.authorizationCode);
+
+      if (result.success) {
+        setTestResult("success");
+        toast({
+          title: "Sucesso",
+          description: "Conexão estabelecida com sucesso!",
+        });
+        setOauthStep("credentials");
+        onSave({ ...formData, enabled: true });
+      } else {
+        setTestResult("error");
+        throw new Error(result.message || "Falha na conexão");
+      }
+    } catch (error: unknown) {
+      setTestResult("error");
+      toast({
+        title: "Erro",
+        description: getErrorMessage(
+          error,
+          "Falha na conexão. Verifique as credenciais."
+        ),
+        variant: "destructive",
+      });
+    }
   };
 
   const isSecretField = (key: string) => {
@@ -164,58 +301,97 @@ export function MarketplaceConfigDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {fields.map((field) => (
-            <div key={field.key} className="space-y-2">
-              <Label htmlFor={field.key} className="flex items-center gap-1">
-                {field.label}
-                {field.required && <span className="text-destructive">*</span>}
-              </Label>
-              <div className="relative">
-                <Input
-                  id={field.key}
-                  type={
-                    isSecretField(field.key) && !showSecrets[field.key]
-                      ? "password"
-                      : "text"
-                  }
-                  placeholder={field.placeholder}
-                  value={(formData[field.key] as string) || ""}
-                  onChange={(e) => handleInputChange(field.key, e.target.value)}
-                  className="pr-10"
-                />
-                {isSecretField(field.key) && (
+          {oauthStep === "credentials" ? (
+            <>
+              {fields.map((field) => (
+                <div key={field.key} className="space-y-2">
+                  <Label
+                    htmlFor={field.key}
+                    className="flex items-center gap-1"
+                  >
+                    {field.label}
+                    {field.required && (
+                      <span className="text-destructive">*</span>
+                    )}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id={field.key}
+                      type={
+                        isSecretField(field.key) && !showSecrets[field.key]
+                          ? "password"
+                          : "text"
+                      }
+                      placeholder={field.placeholder}
+                      value={(formData[field.key] as string) || ""}
+                      onChange={(e) =>
+                        handleInputChange(field.key, e.target.value)
+                      }
+                      disabled={
+                        credentials &&
+                        (field.key === "clientId" ||
+                          field.key === "redirectUri")
+                      }
+                      className="pr-10"
+                    />
+                    {isSecretField(field.key) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => toggleShowSecret(field.key)}
+                      >
+                        {showSecrets[field.key] ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : (
+            <>
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Passo 1: Autorizar aplicativo</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Clique no botão abaixo para autorizar o acesso ao Mercado
+                    Livre. Você será redirecionado para a página de autorização.
+                  </p>
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => toggleShowSecret(field.key)}
+                    variant="outline"
+                    onClick={() => window.open(getAuthorizationUrl(), "_blank")}
+                    className="w-full"
                   >
-                    {showSecrets[field.key] ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Autorizar no Mercado Livre
                   </Button>
-                )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="authorizationCode">
+                    Passo 2: Cole o código de autorização
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Após autorizar, você receberá um código. Cole-o no campo
+                    abaixo.
+                  </p>
+                  <Input
+                    id="authorizationCode"
+                    placeholder="Cole o código aqui"
+                    value={formData.authorizationCode || ""}
+                    onChange={(e) =>
+                      handleInputChange("authorizationCode", e.target.value)
+                    }
+                  />
+                </div>
               </div>
-            </div>
-          ))}
-
-          <div className="flex items-center justify-between pt-4 border-t">
-            <div className="space-y-0.5">
-              <Label>Ativar Integração</Label>
-              <p className="text-sm text-muted-foreground">
-                Habilitar sincronização automática
-              </p>
-            </div>
-            <Switch
-              checked={formData.enabled}
-              onCheckedChange={(checked) =>
-                handleInputChange("enabled", checked)
-              }
-            />
-          </div>
+            </>
+          )}
 
           {testResult && (
             <div
@@ -241,18 +417,77 @@ export function MarketplaceConfigDialog({
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={isTesting}
-            className="w-full sm:w-auto"
-          >
-            {isTesting ? "Testando..." : "Testar Conexão"}
-          </Button>
-          <Button onClick={handleSave} className="w-full sm:w-auto">
-            Salvar Configuração
-          </Button>
+          {oauthStep === "credentials" ? (
+            <>
+              {/* Botão responsavel por avançar de tela, salvar configurações iniciais e avançar para etapa de configuração */}
+              <Button
+                onClick={handleContinueConfig}
+                disabled={
+                  isSaving ||
+                  !formData.clientId ||
+                  !formData.clientSecret ||
+                  !formData.redirectUri
+                }
+                className="w-full sm:w-auto"
+              >
+                {isSaving ? "Salvando..." : "Continuar configuração"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setOauthStep("credentials")}
+                className="w-full sm:w-auto"
+              >
+                Voltar
+              </Button>
+              {/* Botão responsavel por salvar as alterações e fechar o popup. Adicionar uma confirmação de que as alterações serão salvas. */}
+              <Button
+                variant="outline"
+                onClick={confirmSaveCredentials}
+                disabled={
+                  isSaving ||
+                  !formData.clientId ||
+                  !formData.clientSecret ||
+                  !formData.redirectUri
+                }
+                className="w-full sm:w-auto"
+              >
+                {isSaving ? "Salvando..." : "Salvar Credenciais"}
+              </Button>
+              {/* Botão responsavel por realizar o teste de conexão. Deverá ficar desabilitado caso o código de autorização não tenha sido informado. Deverá ficar desabilitado caso o teste de conexão já tenha sido realizado com sucesso. Aviso de sucesso ou erro para feedback.*/}
+              <Button
+                onClick={handleTestConnection}
+                disabled={
+                  isTesting ||
+                  !formData.authorizationCode ||
+                  testResult === "success"
+                }
+                className="w-full sm:w-auto"
+              >
+                {isTesting ? "Testando..." : "Testar Conexão"}
+              </Button>
+            </>
+          )}
         </DialogFooter>
+        <AlertDialog open={showSaveConfirm} onOpenChange={setShowSaveConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Salvar alterações?</AlertDialogTitle>
+              <AlertDialogDescription>
+                As alterações nas credenciais serão salvas. Você poderá
+                continuar a configuração depois.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSaveCredentials}>
+                Salvar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

@@ -8,6 +8,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { marketplaces, Marketplace } from "@/lib/mockData";
 import { useState } from "react";
 import { Settings2, CheckCircle2, XCircle } from "lucide-react";
@@ -16,6 +26,8 @@ import {
   MarketplaceConfig,
 } from "@/components/MarketplaceConfigDialog";
 import { MarketplaceLogo } from "@/components/MarketplaceLogo";
+import { useMercadoLivreCredentials } from "@/hooks/useMercadoLivreCredentials";
+import { useToast } from "@/hooks/use-toast";
 
 // Estado inicial das configurações de cada marketplace
 const initialConfigs: Record<string, MarketplaceConfig> = {
@@ -76,6 +88,9 @@ const initialConfigs: Record<string, MarketplaceConfig> = {
 };
 
 export default function Settings() {
+  const { credentials, toggleActive, isToggling } =
+    useMercadoLivreCredentials();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
@@ -87,6 +102,7 @@ export default function Settings() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [configs, setConfigs] =
     useState<Record<string, MarketplaceConfig>>(initialConfigs);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
 
   const handleConfigClick = (marketplace: Marketplace) => {
     setSelectedMarketplace(marketplace);
@@ -103,8 +119,80 @@ export default function Settings() {
   };
 
   const isConfigured = (marketplaceId: string) => {
+    // Para Mercado Livre, verifica se há credenciais no banco
+    if (marketplaceId === "1" && credentials) {
+      return credentials.oauth_completed;
+    }
+
+    // Para outros marketplaces, usa a lógica antiga
     const config = configs[marketplaceId];
     return config && config.apiKey && config.enabled;
+  };
+
+  const isActive = (marketplaceId: string) => {
+    if (marketplaceId === "1" && credentials) {
+      return credentials.is_active;
+    }
+
+    const config = configs[marketplaceId];
+    return config?.enabled || false;
+  };
+
+  // Função helper para extrair mensagem de erro do axios
+  const getErrorMessage = (error: unknown, defaultMessage: string): string => {
+    if (
+      error &&
+      typeof error === "object" &&
+      "response" in error &&
+      error.response &&
+      typeof error.response === "object" &&
+      "data" in error.response &&
+      error.response.data &&
+      typeof error.response.data === "object" &&
+      "message" in error.response.data &&
+      typeof error.response.data.message === "string"
+    ) {
+      return error.response.data.message;
+    }
+    return defaultMessage;
+  };
+
+  const handleToggleActive = async (checked: boolean) => {
+    if (!checked) {
+      setShowDeactivateConfirm(true);
+      return;
+    }
+
+    try {
+      await toggleActive(true);
+      toast({
+        title: "Sucesso",
+        description: "Integração ativada",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro",
+        description: getErrorMessage(error, "Erro ao ativar integração"),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const confirmDeactivate = async () => {
+    try {
+      await toggleActive(false);
+      setShowDeactivateConfirm(false);
+      toast({
+        title: "Sucesso",
+        description: "Integração desativada",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Erro",
+        description: getErrorMessage(error, "Erro ao desativar integração"),
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -131,7 +219,7 @@ export default function Settings() {
               .filter((m) => m.name === "Mercado Livre")
               .map((marketplace) => {
                 const configured = isConfigured(marketplace.id);
-                const config = configs[marketplace.id];
+                const active = isActive(marketplace.id);
 
                 return (
                   <div
@@ -163,15 +251,17 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge
-                        variant={
-                          configured && config?.enabled
-                            ? "default"
-                            : "secondary"
-                        }
-                      >
-                        {configured && config?.enabled ? "Ativo" : "Inativo"}
-                      </Badge>
+                      {/* Inserir um check de ativação indicando a ativação ou desativação da integração. Deverá ficar desabilitado caso a integração não tenha sido configurada. Diálogo de confirmação para desativar com informativo de que será necessário os passos de configuração novamente se quiser reativar a integração */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {active ? "Ativo" : "Inativo"}
+                        </span>
+                        <Switch
+                          checked={active}
+                          onCheckedChange={handleToggleActive}
+                          disabled={!configured || isToggling}
+                        />
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
@@ -287,6 +377,25 @@ export default function Settings() {
         }
         onSave={handleSaveConfig}
       />
+
+      {/* Dialog de Confirmação de Desativação */}
+      <AlertDialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar integração?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ao desativar a integração, você precisará realizar os passos de
+              configuração novamente se quiser reativá-la no futuro.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate}>
+              Desativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
