@@ -17,6 +17,8 @@ dist-ssr
 .env.local
 .env.production.local
 .env.development.local
+# Mas mantenha o .env.example no controle de versão
+!.env.example
 
 # Editor directories and files
 .vscode/*
