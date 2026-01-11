@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,14 +6,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Eye, EyeOff, Check, X } from 'lucide-react';
-import { Marketplace } from '@/lib/mockData';
-import { MarketplaceLogo } from '@/components/MarketplaceLogo';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Eye, EyeOff, Check, X } from "lucide-react";
+import { Marketplace } from "@/lib/mockData";
+import { MarketplaceLogo } from "@/components/MarketplaceLogo";
 
 export interface MarketplaceConfig {
   apiKey: string;
@@ -21,8 +21,10 @@ export interface MarketplaceConfig {
   sellerId?: string;
   accessToken?: string;
   refreshToken?: string;
-  clientId?: string;
-  clientSecret?: string;
+  clientId: string;
+  clientSecret: string;
+  authorizationCode: string;
+  redirectUri: string;
   storeUrl?: string;
   enabled: boolean;
 }
@@ -36,51 +38,54 @@ interface MarketplaceConfigDialogProps {
 }
 
 // Campos específicos por marketplace
-const marketplaceFields: Record<string, { label: string; key: keyof MarketplaceConfig; required: boolean; placeholder: string }[]> = {
-  'Mercado Livre': [
-    { label: 'Client ID', key: 'clientId', required: true, placeholder: 'Ex: 1234567890123456' },
-    { label: 'Client Secret', key: 'clientSecret', required: true, placeholder: 'Sua chave secreta do ML' },
-    { label: 'Access Token', key: 'accessToken', required: true, placeholder: 'Token de acesso OAuth' },
-    { label: 'Refresh Token', key: 'refreshToken', required: false, placeholder: 'Token para renovação automática' },
-    { label: 'Seller ID', key: 'sellerId', required: true, placeholder: 'Ex: 123456789' },
-  ],
-  'Amazon': [
-    { label: 'Seller ID', key: 'sellerId', required: true, placeholder: 'ID do vendedor Amazon' },
-    { label: 'MWS Access Key', key: 'apiKey', required: true, placeholder: 'Chave de acesso MWS' },
-    { label: 'MWS Secret Key', key: 'apiSecret', required: true, placeholder: 'Chave secreta MWS' },
-    { label: 'Refresh Token (SP-API)', key: 'refreshToken', required: true, placeholder: 'Token LWA Refresh' },
-    { label: 'Client ID (SP-API)', key: 'clientId', required: true, placeholder: 'ID do aplicativo SP-API' },
-    { label: 'Client Secret (SP-API)', key: 'clientSecret', required: true, placeholder: 'Segredo do aplicativo SP-API' },
-  ],
-  'Shopee': [
-    { label: 'Partner ID', key: 'clientId', required: true, placeholder: 'ID do parceiro Shopee' },
-    { label: 'Partner Key', key: 'apiKey', required: true, placeholder: 'Chave de parceiro' },
-    { label: 'Shop ID', key: 'sellerId', required: true, placeholder: 'ID da sua loja' },
-    { label: 'Access Token', key: 'accessToken', required: true, placeholder: 'Token de acesso' },
-    { label: 'Refresh Token', key: 'refreshToken', required: false, placeholder: 'Token de renovação' },
-  ],
-  'Magalu': [
-    { label: 'API Key', key: 'apiKey', required: true, placeholder: 'Chave de API do Marketplace' },
-    { label: 'API Secret', key: 'apiSecret', required: true, placeholder: 'Segredo da API' },
-    { label: 'Seller ID', key: 'sellerId', required: true, placeholder: 'ID do seller no Magalu' },
-    { label: 'Access Token', key: 'accessToken', required: false, placeholder: 'Token de autenticação' },
-  ],
-  'Site Próprio': [
-    { label: 'URL da Loja', key: 'storeUrl', required: true, placeholder: 'https://sualoja.com.br' },
-    { label: 'API Key', key: 'apiKey', required: true, placeholder: 'Chave de API da sua loja' },
-    { label: 'API Secret', key: 'apiSecret', required: false, placeholder: 'Segredo da API (se aplicável)' },
+const marketplaceFields: Record<
+  string,
+  {
+    label: string;
+    key: keyof MarketplaceConfig;
+    required: boolean;
+    placeholder: string;
+  }[]
+> = {
+  "Mercado Livre": [
+    {
+      label: "Client ID",
+      key: "clientId",
+      required: true,
+      placeholder: "Ex: 1234567890123456",
+    },
+    {
+      label: "Client Secret",
+      key: "clientSecret",
+      required: true,
+      placeholder: "Sua chave secreta do ML",
+    },
+    {
+      label: "Authorization Code",
+      key: "authorizationCode",
+      required: true,
+      placeholder: "Código de autenticação",
+    },
+    {
+      label: "URI de Redirecionamento",
+      key: "redirectUri",
+      required: true,
+      placeholder: "Código de autenticação",
+    },
   ],
 };
 
 const defaultConfig: MarketplaceConfig = {
-  apiKey: '',
-  apiSecret: '',
-  sellerId: '',
-  accessToken: '',
-  refreshToken: '',
-  clientId: '',
-  clientSecret: '',
-  storeUrl: '',
+  apiKey: "",
+  apiSecret: "",
+  sellerId: "",
+  accessToken: "",
+  refreshToken: "",
+  clientId: "",
+  clientSecret: "",
+  redirectUri: "",
+  authorizationCode: "",
+  storeUrl: "",
   enabled: false,
 };
 
@@ -91,36 +96,44 @@ export function MarketplaceConfigDialog({
   config,
   onSave,
 }: MarketplaceConfigDialogProps) {
-  const [formData, setFormData] = useState<MarketplaceConfig>(config || defaultConfig);
+  const [formData, setFormData] = useState<MarketplaceConfig>(
+    config || defaultConfig
+  );
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<'success' | 'error' | null>(null);
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(
+    null
+  );
 
   if (!marketplace) return null;
 
-  const fields = marketplaceFields[marketplace.name] || marketplaceFields['Site Próprio'];
+  const fields =
+    marketplaceFields[marketplace.name] || marketplaceFields["Site Próprio"];
 
-  const handleInputChange = (key: keyof MarketplaceConfig, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+  const handleInputChange = (
+    key: keyof MarketplaceConfig,
+    value: string | boolean
+  ) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
     setTestResult(null);
   };
 
   const toggleShowSecret = (key: string) => {
-    setShowSecrets(prev => ({ ...prev, [key]: !prev[key] }));
+    setShowSecrets((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
-    
+
     // Simulação de teste de conexão
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     // Simular sucesso se todos os campos obrigatórios estiverem preenchidos
-    const requiredFields = fields.filter(f => f.required);
-    const allFilled = requiredFields.every(f => formData[f.key]);
-    
-    setTestResult(allFilled ? 'success' : 'error');
+    const requiredFields = fields.filter((f) => f.required);
+    const allFilled = requiredFields.every((f) => formData[f.key]);
+
+    setTestResult(allFilled ? "success" : "error");
     setIsTesting(false);
   };
 
@@ -130,9 +143,11 @@ export function MarketplaceConfigDialog({
   };
 
   const isSecretField = (key: string) => {
-    return key.toLowerCase().includes('secret') || 
-           key.toLowerCase().includes('token') || 
-           key === 'apiKey';
+    return (
+      key.toLowerCase().includes("secret") ||
+      key.toLowerCase().includes("token") ||
+      key === "apiKey"
+    );
   };
 
   return (
@@ -158,9 +173,13 @@ export function MarketplaceConfigDialog({
               <div className="relative">
                 <Input
                   id={field.key}
-                  type={isSecretField(field.key) && !showSecrets[field.key] ? 'password' : 'text'}
+                  type={
+                    isSecretField(field.key) && !showSecrets[field.key]
+                      ? "password"
+                      : "text"
+                  }
                   placeholder={field.placeholder}
-                  value={(formData[field.key] as string) || ''}
+                  value={(formData[field.key] as string) || ""}
                   onChange={(e) => handleInputChange(field.key, e.target.value)}
                   className="pr-10"
                 />
@@ -192,19 +211,21 @@ export function MarketplaceConfigDialog({
             </div>
             <Switch
               checked={formData.enabled}
-              onCheckedChange={(checked) => handleInputChange('enabled', checked)}
+              onCheckedChange={(checked) =>
+                handleInputChange("enabled", checked)
+              }
             />
           </div>
 
           {testResult && (
             <div
               className={`flex items-center gap-2 p-3 rounded-lg ${
-                testResult === 'success'
-                  ? 'bg-green-500/10 text-green-600 border border-green-500/20'
-                  : 'bg-destructive/10 text-destructive border border-destructive/20'
+                testResult === "success"
+                  ? "bg-green-500/10 text-green-600 border border-green-500/20"
+                  : "bg-destructive/10 text-destructive border border-destructive/20"
               }`}
             >
-              {testResult === 'success' ? (
+              {testResult === "success" ? (
                 <>
                   <Check className="h-4 w-4" />
                   Conexão estabelecida com sucesso!
@@ -226,7 +247,7 @@ export function MarketplaceConfigDialog({
             disabled={isTesting}
             className="w-full sm:w-auto"
           >
-            {isTesting ? 'Testando...' : 'Testar Conexão'}
+            {isTesting ? "Testando..." : "Testar Conexão"}
           </Button>
           <Button onClick={handleSave} className="w-full sm:w-auto">
             Salvar Configuração
