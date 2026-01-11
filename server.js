@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
+import { encrypt, decrypt } from "./server/utils/encryption.js";
+import { supabase } from "./server/utils/supabase.js";
 
 dotenv.config();
 
@@ -12,33 +14,102 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Variáveis globais para armazenar tokens em memória
+// Variáveis globais para armazenar tokens em memória (fallback)
 let accessToken = null;
 let refreshToken = null;
 
-// Variáveis de ambiente do .env
-const CLIENT_ID = process.env.ML_CLIENT_ID;
-const CLIENT_SECRET = process.env.ML_CLIENT_SECRET;
-const REDIRECT_URI = process.env.ML_REDIRECT_URI;
-const AUTHORIZATION_CODE = process.env.ML_AUTHORIZATION_CODE;
-const REFRESH_TOKEN_FROM_ENV = process.env.ML_REFRESH_TOKEN;
+// Função para obter credenciais do banco de dados
+async function getCredentialsFromDB() {
+  try {
+    const { data, error } = await supabase
+      .from("mercado_livre_credentials")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      client_id: data.client_id,
+      client_secret: decrypt(data.client_secret_encrypted),
+      access_token: data.access_token_encrypted
+        ? decrypt(data.access_token_encrypted)
+        : null,
+      refresh_token: data.refresh_token_encrypted
+        ? decrypt(data.refresh_token_encrypted)
+        : null,
+      redirect_uri: data.redirect_uri,
+      token_expires_at: data.token_expires_at,
+      oauth_completed: data.oauth_completed,
+    };
+  } catch (error) {
+    console.error("Erro ao buscar credenciais:", error);
+    return null;
+  }
+}
+
+// Função para atualizar tokens no banco de dados
+async function updateTokensInDB(
+  credentialsId,
+  accessToken,
+  refreshToken,
+  expiresIn = 21600
+) {
+  try {
+    const expiresAt = new Date();
+    expiresAt.setSeconds(expiresAt.getSeconds() + expiresIn - 300); // Renovar 5 minutos antes do vencimento
+
+    const { error } = await supabase
+      .from("mercado_livre_credentials")
+      .update({
+        access_token_encrypted: encrypt(accessToken),
+        refresh_token_encrypted: refreshToken
+          ? encrypt(refreshToken)
+          : undefined,
+        token_expires_at: expiresAt.toISOString(),
+        oauth_completed: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", credentialsId);
+
+    if (error) {
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error("Erro ao atualizar tokens no banco:", error);
+    throw error;
+  }
+}
 
 // Função para obter tokens iniciais usando o authorization code
-async function getInitialTokens() {
-  if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI || !AUTHORIZATION_CODE) {
-    throw new Error("Missing required environment variables");
+async function getInitialTokens(
+  clientId,
+  clientSecret,
+  redirectUri,
+  authorizationCode
+) {
+  if (!clientId || !clientSecret || !redirectUri || !authorizationCode) {
+    throw new Error("Missing required credentials");
   }
 
   try {
-    const url = `https://api.mercadolibre.com/oauth/token?grant_type=authorization_code&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&code=${AUTHORIZATION_CODE}&redirect_uri=${REDIRECT_URI}`;
+    const url = `https://api.mercadolibre.com/oauth/token?grant_type=authorization_code&client_id=${clientId}&client_secret=${clientSecret}&code=${authorizationCode}&redirect_uri=${redirectUri}`;
 
     const response = await axios.post(url);
 
     if (response.status === 200 && response.data) {
-      accessToken = response.data.access_token;
-      refreshToken = response.data.refresh_token;
-      console.log("Tokens obtidos com sucesso!");
-      return { access_token: accessToken, refresh_token: refreshToken };
+      return {
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+        expires_in: response.data.expires_in || 21600,
+        user_id: response.data.user_id,
+      };
     }
 
     throw new Error("Failed to get tokens");
@@ -56,24 +127,22 @@ async function getInitialTokens() {
 }
 
 // Função para renovar o access_token usando o refresh_token
-async function refreshAccessToken() {
-  if (!CLIENT_ID || !CLIENT_SECRET || !refreshToken) {
+async function refreshAccessToken(clientId, clientSecret, refreshTokenValue) {
+  if (!clientId || !clientSecret || !refreshTokenValue) {
     throw new Error("Missing client credentials or refresh token");
   }
 
   try {
-    const url = `https://api.mercadolibre.com/oauth/token?grant_type=refresh_token&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&refresh_token=${refreshToken}`;
+    const url = `https://api.mercadolibre.com/oauth/token?grant_type=refresh_token&client_id=${clientId}&client_secret=${clientSecret}&refresh_token=${refreshTokenValue}`;
 
     const response = await axios.post(url);
 
     if (response.status === 200 && response.data) {
-      accessToken = response.data.access_token;
-      // O refresh_token pode ser atualizado também
-      if (response.data.refresh_token) {
-        refreshToken = response.data.refresh_token;
-      }
-      console.log("Token renovado com sucesso!");
-      return { access_token: accessToken, refresh_token: refreshToken };
+      return {
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token || refreshTokenValue,
+        expires_in: response.data.expires_in || 21600,
+      };
     }
 
     throw new Error("Failed to refresh token");
@@ -90,20 +159,49 @@ async function refreshAccessToken() {
   }
 }
 
+// Função para obter e renovar token automaticamente se necessário
+async function getValidAccessToken() {
+  const credentials = await getCredentialsFromDB();
+  if (!credentials) {
+    throw new Error("No active credentials found");
+  }
+
+  // Verifica se o token expirou ou está próximo de expirar (5 minutos de margem)
+  const now = new Date();
+  const expiresAt = credentials.token_expires_at
+    ? new Date(credentials.token_expires_at)
+    : null;
+
+  if (!expiresAt || now >= new Date(expiresAt.getTime() - 5 * 60 * 1000)) {
+    // Token expirado ou próximo de expirar, renova
+    console.log("Token expirado ou próximo de expirar. Renovando...");
+    const tokens = await refreshAccessToken(
+      credentials.client_id,
+      credentials.client_secret,
+      credentials.refresh_token
+    );
+    await updateTokensInDB(
+      credentials.id,
+      tokens.access_token,
+      tokens.refresh_token,
+      tokens.expires_in
+    );
+    return tokens.access_token;
+  }
+
+  return credentials.access_token;
+}
+
 // Função helper para fazer requisições com renovação automática em caso de 401
 async function makeRequestWithAutoRefresh(url, config = {}) {
-  if (!accessToken) {
-    throw new Error(
-      "No access token available. Please initialize tokens first."
-    );
-  }
+  let token = await getValidAccessToken();
 
   // Adiciona o access_token no header Authorization
   const requestConfig = {
     ...config,
     headers: {
       ...config.headers,
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${token}`,
     },
   };
 
@@ -114,14 +212,14 @@ async function makeRequestWithAutoRefresh(url, config = {}) {
     // Se receber 401 (não autorizado), renova o token e tenta novamente
     if (error.response && error.response.status === 401) {
       console.log("Token expirado. Renovando...");
-      await refreshAccessToken();
+      token = await getValidAccessToken();
 
       // Tenta novamente com o novo token
       const retryConfig = {
         ...config,
         headers: {
           ...config.headers,
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${token}`,
         },
       };
 
@@ -132,31 +230,238 @@ async function makeRequestWithAutoRefresh(url, config = {}) {
   }
 }
 
-// Endpoint para inicializar tokens (usar apenas uma vez)
-app.get("/api/mercadolibre/init", async (req, res) => {
+// ===== NOVOS ENDPOINTS PARA GERENCIAR CREDENCIAIS =====
+
+// Endpoint para salvar credenciais do Mercado Livre
+app.post("/api/mercadolibre/credentials", async (req, res) => {
   try {
-    const tokens = await getInitialTokens();
+    const { clientId, clientSecret, redirectUri } = req.body;
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      return res.status(400).json({
+        message: "Client ID, Client Secret e Redirect URI são obrigatórios",
+      });
+    }
+
+    // Desativa outras credenciais ativas
+    await supabase
+      .from("mercado_livre_credentials")
+      .update({ is_active: false })
+      .eq("is_active", true);
+
+    // Insere nova credencial
+    const { data, error } = await supabase
+      .from("mercado_livre_credentials")
+      .insert({
+        client_id: clientId,
+        client_secret_encrypted: encrypt(clientSecret),
+        redirect_uri: redirectUri,
+        is_active: false, // Não ativa até completar OAuth
+        oauth_completed: false,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
     res.json({
-      message: "Tokens obtidos e armazenados em memória com sucesso!",
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
+      message: "Credenciais salvas com sucesso",
+      id: data.id,
     });
   } catch (error) {
+    console.error("Erro ao salvar credenciais:", error);
+    res.status(500).json({
+      message: "Erro ao salvar credenciais",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint para obter credenciais (sem tokens sensíveis)
+app.get("/api/mercadolibre/credentials", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("mercado_livre_credentials")
+      .select(
+        "id, client_id, redirect_uri, is_active, oauth_completed, created_at, updated_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      return res.json(null);
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error("Erro ao buscar credenciais:", error);
+    res.status(500).json({
+      message: "Erro ao buscar credenciais",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint para testar conexão (OAuth inicial)
+app.post("/api/mercadolibre/test-connection", async (req, res) => {
+  try {
+    const { authorizationCode } = req.body;
+
+    if (!authorizationCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Authorization code é obrigatório",
+      });
+    }
+
+    // Busca credenciais do banco (ativas ou inativas)
+    let credentials = await getCredentialsFromDB();
+    let credentialId = null;
+    let clientId = null;
+    let clientSecret = null;
+    let redirectUri = null;
+
+    if (!credentials) {
+      // Se não houver credenciais ativas, busca qualquer credencial recente
+      const { data, error } = await supabase
+        .from("mercado_livre_credentials")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Credenciais não encontradas. Configure as credenciais primeiro.",
+        });
+      }
+
+      credentialId = data.id;
+      clientId = data.client_id;
+      clientSecret = decrypt(data.client_secret_encrypted);
+      redirectUri = data.redirect_uri;
+    } else {
+      credentialId = credentials.id;
+      clientId = credentials.client_id;
+      clientSecret = credentials.client_secret;
+      redirectUri = credentials.redirect_uri;
+    }
+
+    // Obtém tokens iniciais usando o authorization code
+    const tokens = await getInitialTokens(
+      clientId,
+      clientSecret,
+      redirectUri,
+      authorizationCode
+    );
+
+    // Atualiza com os tokens
+    const expiresAt = new Date();
+    expiresAt.setSeconds(expiresAt.getSeconds() + tokens.expires_in - 300);
+
+    const { error: updateError } = await supabase
+      .from("mercado_livre_credentials")
+      .update({
+        access_token_encrypted: encrypt(tokens.access_token),
+        refresh_token_encrypted: encrypt(tokens.refresh_token),
+        token_expires_at: expiresAt.toISOString(),
+        oauth_completed: true,
+        is_active: true, // Ativa ao completar OAuth
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", credentialId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Verifica se a conexão está funcionando
+    try {
+      const testResponse = await axios.get(
+        "https://api.mercadolibre.com/users/me",
+        {
+          headers: { Authorization: `Bearer ${tokens.access_token}` },
+        }
+      );
+
+      res.json({
+        success: true,
+        message: "Conexão estabelecida com sucesso!",
+        user_id: testResponse.data.id,
+      });
+    } catch (testError) {
+      console.error("Erro ao verificar conexão:", testError);
+      throw new Error("Falha ao verificar conexão com a API do Mercado Livre");
+    }
+  } catch (error) {
+    console.error("Erro ao testar conexão:", error);
     res.status(400).json({
-      message: "Erro ao obter tokens",
+      success: false,
+      message: "Falha na conexão",
+      error: error.message,
+    });
+  }
+});
+
+// Endpoint para ativar/desativar integração
+app.patch("/api/mercadolibre/credentials/active", async (req, res) => {
+  try {
+    const { isActive } = req.body;
+
+    const { data, error } = await supabase
+      .from("mercado_livre_credentials")
+      .update({ is_active: isActive })
+      .eq("is_active", !isActive)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({
+      message: isActive ? "Integração ativada" : "Integração desativada",
+      is_active: isActive,
+    });
+  } catch (error) {
+    console.error("Erro ao atualizar status:", error);
+    res.status(500).json({
+      message: "Erro ao atualizar status",
       error: error.message,
     });
   }
 });
 
 // Endpoint para renovar tokens manualmente
-app.get("/api/mercadolibre/refresh", async (req, res) => {
+app.post("/api/mercadolibre/refresh", async (req, res) => {
   try {
-    const tokens = await refreshAccessToken();
+    const credentials = await getCredentialsFromDB();
+    if (!credentials) {
+      return res.status(404).json({
+        message: "Credenciais não encontradas",
+      });
+    }
+
+    const tokens = await refreshAccessToken(
+      credentials.client_id,
+      credentials.client_secret,
+      credentials.refresh_token
+    );
+
+    await updateTokensInDB(
+      credentials.id,
+      tokens.access_token,
+      tokens.refresh_token,
+      tokens.expires_in
+    );
+
     res.json({
       message: "Token renovado com sucesso!",
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
     });
   } catch (error) {
     res.status(400).json({
@@ -260,32 +565,31 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+// Job para renovar tokens automaticamente antes de expirar
+setInterval(async () => {
+  try {
+    const credentials = await getCredentialsFromDB();
+    if (!credentials || !credentials.token_expires_at) {
+      return;
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(credentials.token_expires_at);
+    const timeUntilExpiry = expiresAt.getTime() - now.getTime();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    // Renova se estiver próximo de expirar (5 minutos de margem)
+    if (timeUntilExpiry > 0 && timeUntilExpiry < fiveMinutes) {
+      console.log("Renovando token automaticamente...");
+      await getValidAccessToken();
+      console.log("Token renovado com sucesso!");
+    }
+  } catch (error) {
+    console.error("Erro no job de renovação automática:", error.message);
+  }
+}, 60 * 1000); // Verifica a cada minuto
+
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-
-  // Tenta obter tokens automaticamente usando refresh_token do .env (se disponível)
-  if (REFRESH_TOKEN_FROM_ENV && CLIENT_ID && CLIENT_SECRET) {
-    console.log("Usando refresh_token do .env para obter tokens...");
-    refreshToken = REFRESH_TOKEN_FROM_ENV;
-    refreshAccessToken()
-      .then(() => {
-        console.log("Tokens obtidos automaticamente usando refresh_token!");
-      })
-      .catch((error) => {
-        console.log(
-          "Não foi possível obter tokens usando refresh_token:",
-          error.message
-        );
-        console.log(
-          "Use o endpoint GET /api/mercadolibre/init para obter tokens usando o authorization code"
-        );
-      });
-  } else {
-    console.log(
-      "Refresh token não encontrado no .env. Use o endpoint GET /api/mercadolibre/init para obter tokens pela primeira vez"
-    );
-    console.log(
-      "Após obter os tokens, salve o refresh_token no .env como ML_REFRESH_TOKEN para uso automático nas próximas vezes"
-    );
-  }
+  console.log("Job de renovação automática de tokens iniciado");
 });
