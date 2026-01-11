@@ -22,18 +22,21 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/*" element={
-            <Layout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/devolucoes" element={<Returns />} />
-                <Route path="/devolucoes/:id" element={<ReturnDetail />} />
-                <Route path="/analises" element={<Analytics />} />
-                <Route path="/configuracoes" element={<Settings />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Layout>
-          } />
+          <Route
+            path="/*"
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/devolucoes" element={<Returns />} />
+                  <Route path="/devolucoes/:id" element={<ReturnDetail />} />
+                  <Route path="/analises" element={<Analytics />} />
+                  <Route path="/configuracoes" element={<Settings />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Layout>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

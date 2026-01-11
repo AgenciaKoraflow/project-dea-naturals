@@ -251,7 +251,7 @@ export default function Settings() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {/* Inserir um check de ativação indicando a ativação ou desativação da integração. Deverá ficar desabilitado caso a integração não tenha sido configurada. Diálogo de confirmação para desativar com informativo de que será necessário os passos de configuração novamente se quiser reativar a integração */}
+                      {/* Utilizar a rota de status e caso tenha alguma informação negativo, sinalizar com um ícone de alerta e ao passar o mouse sobre o icone, exibir a mensagem */}
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
                           {active ? "Ativo" : "Inativo"}
@@ -379,7 +379,10 @@ export default function Settings() {
       />
 
       {/* Dialog de Confirmação de Desativação */}
-      <AlertDialog open={showDeactivateConfirm} onOpenChange={setShowDeactivateConfirm}>
+      <AlertDialog
+        open={showDeactivateConfirm}
+        onOpenChange={setShowDeactivateConfirm}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Desativar integração?</AlertDialogTitle>

@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
-import { encrypt, decrypt } from "./server/utils/encryption.js";
-import { supabase } from "./server/utils/supabase.js";
+import { encrypt, decrypt } from "./utils/encryption.js";
+import { supabase } from "./utils/supabase.js";
 
 dotenv.config();
 
@@ -552,19 +552,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Exemplo de endpoint
-app.get("/api/users", async (req, res) => {
-  try {
-    const response = await axios.get(
-      "https://jsonplaceholder.typicode.com/users"
-    );
-
-    res.json(response.data);
-  } catch (error) {
-    res.status(500).json({ message: "Erro ao buscar dados" });
-  }
-});
-
 // Job para renovar tokens automaticamente antes de expirar
 setInterval(async () => {
   try {
@@ -580,16 +567,16 @@ setInterval(async () => {
 
     // Renova se estiver próximo de expirar (5 minutos de margem)
     if (timeUntilExpiry > 0 && timeUntilExpiry < fiveMinutes) {
-      console.log("Renovando token automaticamente...");
+      console.log("Automatically renewing token....");
       await getValidAccessToken();
-      console.log("Token renovado com sucesso!");
+      console.log("Token successfully renewed!");
     }
   } catch (error) {
-    console.error("Erro no job de renovação automática:", error.message);
+    console.error("Error in automatic renewal job.:", error.message);
   }
 }, 60 * 1000); // Verifica a cada minuto
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log("Job de renovação automática de tokens iniciado");
+  console.log("Automatic token renewal job started.");
 });
