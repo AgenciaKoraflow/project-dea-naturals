@@ -18,6 +18,26 @@ app.use(express.urlencoded({ extended: true }));
 let accessToken = null;
 let refreshToken = null;
 
+// Função para desativar credenciais no banco de dados
+async function deactivateCredentials(credentialsId) {
+  try {
+    const { error } = await supabase
+      .from("mercado_livre_credentials")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("id", credentialsId);
+
+    if (error) {
+      console.error("Erro ao desativar credenciais:", error);
+    } else {
+      console.log(
+        `Credenciais ${credentialsId} desativadas automaticamente devido a falha na conexão`
+      );
+    }
+  } catch (error) {
+    console.error("Erro ao desativar credenciais:", error);
+  }
+}
+
 // Função para obter credenciais do banco de dados
 async function getCredentialsFromDB() {
   try {
@@ -175,18 +195,25 @@ async function getValidAccessToken() {
   if (!expiresAt || now >= new Date(expiresAt.getTime() - 5 * 60 * 1000)) {
     // Token expirado ou próximo de expirar, renova
     console.log("Token expirado ou próximo de expirar. Renovando...");
-    const tokens = await refreshAccessToken(
-      credentials.client_id,
-      credentials.client_secret,
-      credentials.refresh_token
-    );
-    await updateTokensInDB(
-      credentials.id,
-      tokens.access_token,
-      tokens.refresh_token,
-      tokens.expires_in
-    );
-    return tokens.access_token;
+    try {
+      const tokens = await refreshAccessToken(
+        credentials.client_id,
+        credentials.client_secret,
+        credentials.refresh_token
+      );
+      await updateTokensInDB(
+        credentials.id,
+        tokens.access_token,
+        tokens.refresh_token,
+        tokens.expires_in
+      );
+      return tokens.access_token;
+    } catch (error) {
+      // Se falhar ao renovar, desativa as credenciais
+      console.error("Erro ao renovar token. Desativando credenciais:", error);
+      await deactivateCredentials(credentials.id);
+      throw error;
+    }
   }
 
   return credentials.access_token;
@@ -194,6 +221,11 @@ async function getValidAccessToken() {
 
 // Função helper para fazer requisições com renovação automática em caso de 401
 async function makeRequestWithAutoRefresh(url, config = {}) {
+  let credentials = await getCredentialsFromDB();
+  if (!credentials) {
+    throw new Error("No active credentials found");
+  }
+
   let token = await getValidAccessToken();
 
   // Adiciona o access_token no header Authorization
@@ -212,19 +244,40 @@ async function makeRequestWithAutoRefresh(url, config = {}) {
     // Se receber 401 (não autorizado), renova o token e tenta novamente
     if (error.response && error.response.status === 401) {
       console.log("Token expirado. Renovando...");
-      token = await getValidAccessToken();
+      try {
+        token = await getValidAccessToken();
 
-      // Tenta novamente com o novo token
-      const retryConfig = {
-        ...config,
-        headers: {
-          ...config.headers,
-          Authorization: `Bearer ${token}`,
-        },
-      };
+        // Tenta novamente com o novo token
+        const retryConfig = {
+          ...config,
+          headers: {
+            ...config.headers,
+            Authorization: `Bearer ${token}`,
+          },
+        };
 
-      const retryResponse = await axios.get(url, retryConfig);
-      return retryResponse;
+        try {
+          const retryResponse = await axios.get(url, retryConfig);
+          return retryResponse;
+        } catch (retryError) {
+          // Se após renovar ainda receber 401, as credenciais estão inválidas
+          if (retryError.response && retryError.response.status === 401) {
+            console.error(
+              "Erro 401 persistente após renovar token. Desativando credenciais."
+            );
+            await deactivateCredentials(credentials.id);
+          }
+          throw retryError;
+        }
+      } catch (refreshError) {
+        // Se falhar ao renovar, desativa as credenciais
+        console.error(
+          "Erro ao renovar token após 401. Desativando credenciais:",
+          refreshError
+        );
+        await deactivateCredentials(credentials.id);
+        throw refreshError;
+      }
     }
     throw error;
   }
@@ -447,22 +500,32 @@ app.post("/api/mercadolibre/refresh", async (req, res) => {
       });
     }
 
-    const tokens = await refreshAccessToken(
-      credentials.client_id,
-      credentials.client_secret,
-      credentials.refresh_token
-    );
+    try {
+      const tokens = await refreshAccessToken(
+        credentials.client_id,
+        credentials.client_secret,
+        credentials.refresh_token
+      );
 
-    await updateTokensInDB(
-      credentials.id,
-      tokens.access_token,
-      tokens.refresh_token,
-      tokens.expires_in
-    );
+      await updateTokensInDB(
+        credentials.id,
+        tokens.access_token,
+        tokens.refresh_token,
+        tokens.expires_in
+      );
 
-    res.json({
-      message: "Token renovado com sucesso!",
-    });
+      res.json({
+        message: "Token renovado com sucesso!",
+      });
+    } catch (refreshError) {
+      // Se falhar ao renovar, desativa as credenciais
+      console.error(
+        "Erro ao renovar token. Desativando credenciais:",
+        refreshError
+      );
+      await deactivateCredentials(credentials.id);
+      throw refreshError;
+    }
   } catch (error) {
     res.status(400).json({
       message: "Erro ao renovar token",
@@ -568,11 +631,16 @@ setInterval(async () => {
     // Renova se estiver próximo de expirar (5 minutos de margem)
     if (timeUntilExpiry > 0 && timeUntilExpiry < fiveMinutes) {
       console.log("Automatically renewing token....");
-      await getValidAccessToken();
-      console.log("Token successfully renewed!");
+      try {
+        await getValidAccessToken();
+        console.log("Token successfully renewed!");
+      } catch (renewalError) {
+        // getValidAccessToken já desativa as credenciais em caso de erro
+        console.error("Error in automatic renewal job:", renewalError.message);
+      }
     }
   } catch (error) {
-    console.error("Error in automatic renewal job.:", error.message);
+    console.error("Error in automatic renewal job:", error.message);
   }
 }, 60 * 1000); // Verifica a cada minuto
 

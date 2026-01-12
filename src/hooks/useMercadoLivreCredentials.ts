@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export interface MercadoLivreCredentials {
   id: string;
@@ -19,7 +19,9 @@ export function useMercadoLivreCredentials() {
   const { data, isLoading, error } = useQuery<MercadoLivreCredentials | null>({
     queryKey: ["mercadoLivreCredentials"],
     queryFn: async () => {
-      const response = await axios.get(`${API_URL}/api/mercadolibre/credentials`);
+      const response = await axios.get(
+        `${API_URL}/api/mercadolibre/credentials`
+      );
       return response.data;
     },
   });

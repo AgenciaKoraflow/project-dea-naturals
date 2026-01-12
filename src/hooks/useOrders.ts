@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { MercadoLivreOrdersResponse, OrdersFilters } from "@/lib/mercadoLivreTypes";
+import {
+  MercadoLivreOrdersResponse,
+  OrdersFilters,
+} from "@/lib/mercadoLivreTypes";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 /**
  * Busca pedidos do Mercado Livre via API
  */
-async function fetchOrders(filters: OrdersFilters = {}): Promise<MercadoLivreOrdersResponse> {
+async function fetchOrders(
+  filters: OrdersFilters = {}
+): Promise<MercadoLivreOrdersResponse> {
   const params = new URLSearchParams();
-  
+
   if (filters.status) {
     params.append("status", filters.status);
   }
@@ -22,15 +26,19 @@ async function fetchOrders(filters: OrdersFilters = {}): Promise<MercadoLivreOrd
     params.append("sort", filters.sort);
   }
 
-  const url = `${API_BASE_URL}/api/mercadolibre/orders${params.toString() ? `?${params.toString()}` : ""}`;
-  
+  const url = `${API_BASE_URL}/api/mercadolibre/orders${
+    params.toString() ? `?${params.toString()}` : ""
+  }`;
+
   const response = await fetch(url);
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Erro ao buscar pedidos: ${response.statusText}`);
+    throw new Error(
+      errorData.message || `Erro ao buscar pedidos: ${response.statusText}`
+    );
   }
-  
+
   return response.json();
 }
 
@@ -55,19 +63,21 @@ export function useOrder(orderId: number | string) {
     queryFn: async () => {
       // Por enquanto, busca todos e filtra - idealmente teria um endpoint específico
       const response = await fetchOrders({ limit: 100 });
-      const order = response.orders.results.find(o => o.id.toString() === orderId.toString());
-      
+      const order = response.orders.results.find(
+        (o) => o.id.toString() === orderId.toString()
+      );
+
       if (!order) {
         throw new Error("Pedido não encontrado");
       }
-      
+
       return {
         ...response,
         orders: {
           ...response.orders,
           results: [order],
-          paging: { ...response.orders.paging, total: 1 }
-        }
+          paging: { ...response.orders.paging, total: 1 },
+        },
       };
     },
     enabled: !!orderId,
