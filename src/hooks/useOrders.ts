@@ -62,7 +62,7 @@ export function useOrder(orderId: number | string) {
     queryKey: ["order", orderId],
     queryFn: async () => {
       // Por enquanto, busca todos e filtra - idealmente teria um endpoint específico
-      const response = await fetchOrders({ limit: 100 });
+      const response = await fetchOrders({ limit: 50 });
       const order = response.orders.results.find(
         (o) => o.id.toString() === orderId.toString()
       );

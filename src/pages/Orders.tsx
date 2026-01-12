@@ -28,7 +28,14 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Download, Search, Eye, ArrowUpDown, Package, AlertCircle } from "lucide-react";
+import {
+  Download,
+  Search,
+  Eye,
+  ArrowUpDown,
+  Package,
+  AlertCircle,
+} from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { OrderStatus, MercadoLivreOrder } from "@/lib/mercadoLivreTypes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -47,7 +54,13 @@ const ORDER_STATUS_OPTIONS: { value: OrderStatus | "all"; label: string }[] = [
 ];
 
 function getStatusBadge(status: string) {
-  const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+  const statusConfig: Record<
+    string,
+    {
+      variant: "default" | "secondary" | "destructive" | "outline";
+      label: string;
+    }
+  > = {
     paid: { variant: "default", label: "Pago" },
     confirmed: { variant: "default", label: "Confirmado" },
     payment_required: { variant: "outline", label: "Aguardando pagamento" },
@@ -57,14 +70,23 @@ function getStatusBadge(status: string) {
     invalid: { variant: "destructive", label: "Inválido" },
   };
 
-  const config = statusConfig[status] || { variant: "outline" as const, label: status };
+  const config = statusConfig[status] || {
+    variant: "outline" as const,
+    label: status,
+  };
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }
 
 function getShippingStatusBadge(status?: string) {
   if (!status) return null;
-  
-  const statusConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
+
+  const statusConfig: Record<
+    string,
+    {
+      variant: "default" | "secondary" | "destructive" | "outline";
+      label: string;
+    }
+  > = {
     pending: { variant: "outline", label: "Pendente" },
     handling: { variant: "secondary", label: "Em preparação" },
     ready_to_ship: { variant: "secondary", label: "Pronto para envio" },
@@ -74,8 +96,15 @@ function getShippingStatusBadge(status?: string) {
     cancelled: { variant: "destructive", label: "Cancelado" },
   };
 
-  const config = statusConfig[status] || { variant: "outline" as const, label: status };
-  return <Badge variant={config.variant} className="text-xs">{config.label}</Badge>;
+  const config = statusConfig[status] || {
+    variant: "outline" as const,
+    label: status,
+  };
+  return (
+    <Badge variant={config.variant} className="text-xs">
+      {config.label}
+    </Badge>
+  );
 }
 
 export default function Orders() {
@@ -85,25 +114,45 @@ export default function Orders() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Calcula offset baseado na página atual (paginação server-side)
+  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+
+  // API do Mercado Livre só suporta ordenação por data
+  // Quando ordenar por valor, usa ordenação por data na API e ordena client-side depois
+  const apiSort =
+    sortField === "date"
+      ? sortDirection === "desc"
+        ? "date_desc"
+        : "date_asc"
+      : "date_desc"; // Default para quando ordenar por valor
+
   const { data, isLoading, isError, error } = useOrders({
     status: statusFilter === "all" ? undefined : statusFilter,
-    limit: 100, // Busca mais para permitir filtragem local
-    sort: sortDirection === "desc" ? "date_desc" : "date_asc",
+    limit: ITEMS_PER_PAGE,
+    offset: offset,
+    sort: apiSort,
   });
 
-  const orders = data?.orders?.results || [];
+  const totalOrders = data?.orders?.paging?.total || 0;
+  const totalPages = Math.ceil(totalOrders / ITEMS_PER_PAGE);
 
-  // Filtra por busca local
+  // Filtra e ordena localmente (busca e ordenação por valor são apenas client-side)
   const filteredOrders = useMemo(() => {
+    const orders = data?.orders?.results || [];
     let result = [...orders];
 
+    // Busca local
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter((order) => {
         const orderId = order.id.toString();
-        const buyerName = `${order.buyer.first_name || ""} ${order.buyer.last_name || ""}`.toLowerCase();
+        const buyerName = `${order.buyer.first_name || ""} ${
+          order.buyer.last_name || ""
+        }`.toLowerCase();
         const buyerNickname = order.buyer.nickname?.toLowerCase() || "";
-        const productTitles = order.order_items.map((item) => item.item.title.toLowerCase()).join(" ");
+        const productTitles = order.order_items
+          .map((item) => item.item.title.toLowerCase())
+          .join(" ");
 
         return (
           orderId.includes(query) ||
@@ -114,30 +163,21 @@ export default function Orders() {
       });
     }
 
-    // Ordena
-    result.sort((a, b) => {
-      if (sortField === "date") {
-        const dateA = new Date(a.date_created).getTime();
-        const dateB = new Date(b.date_created).getTime();
-        return sortDirection === "asc" ? dateA - dateB : dateB - dateA;
-      } else {
+    // Ordenação por valor (client-side apenas, já que API só suporta por data)
+    if (sortField === "value") {
+      result.sort((a, b) => {
         return sortDirection === "asc"
           ? a.total_amount - b.total_amount
           : b.total_amount - a.total_amount;
-      }
-    });
+      });
+    }
 
     return result;
-  }, [orders, searchQuery, sortField, sortDirection]);
-
-  // Paginação
-  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  }, [data?.orders?.results, searchQuery, sortField, sortDirection]);
 
   const handleSort = (field: "date" | "value") => {
+    // Reset para primeira página ao mudar ordenação
+    setCurrentPage(1);
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -147,17 +187,24 @@ export default function Orders() {
   };
 
   const handleExport = () => {
+    // Exporta apenas os pedidos da página atual (já que busca completa requeriria múltiplas requisições)
     const csvContent = [
-      ["ID", "Data", "Cliente", "Produtos", "Valor", "Status", "Envio"].join(","),
-      ...filteredOrders.map((order) => [
-        order.id,
-        formatDate(order.date_created),
-        `"${order.buyer.first_name || ""} ${order.buyer.last_name || order.buyer.nickname}"`,
-        `"${order.order_items.map((i) => i.item.title).join("; ")}"`,
-        order.total_amount,
-        order.status,
-        order.shipping?.status || "N/A",
-      ].join(","))
+      ["ID", "Data", "Cliente", "Produtos", "Valor", "Status", "Envio"].join(
+        ","
+      ),
+      ...filteredOrders.map((order) =>
+        [
+          order.id,
+          formatDate(order.date_created),
+          `"${order.buyer.first_name || ""} ${
+            order.buyer.last_name || order.buyer.nickname
+          }"`,
+          `"${order.order_items.map((i) => i.item.title).join("; ")}"`,
+          order.total_amount,
+          order.status,
+          order.shipping?.status || "N/A",
+        ].join(",")
+      ),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -182,7 +229,9 @@ export default function Orders() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Erro ao carregar pedidos</AlertTitle>
           <AlertDescription>
-            {error instanceof Error ? error.message : "Não foi possível carregar os pedidos. Verifique se a integração com o Mercado Livre está configurada corretamente."}
+            {error instanceof Error
+              ? error.message
+              : "Não foi possível carregar os pedidos. Verifique se a integração com o Mercado Livre está configurada corretamente."}
           </AlertDescription>
         </Alert>
       </div>
@@ -198,7 +247,9 @@ export default function Orders() {
           <div>
             <h1 className="text-2xl font-bold">Pedidos</h1>
             <p className="text-sm text-muted-foreground">
-              {filteredOrders.length} pedido{filteredOrders.length !== 1 ? "s" : ""} encontrado{filteredOrders.length !== 1 ? "s" : ""}
+              {totalOrders} pedido
+              {totalOrders !== 1 ? "s" : ""} total
+              {searchQuery && ` (${filteredOrders.length} nesta página)`}
             </p>
           </div>
         </div>
@@ -243,7 +294,7 @@ export default function Orders() {
       </div>
 
       {/* Table */}
-      {paginatedOrders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <div className="text-center py-12 border rounded-lg">
           <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium">Nenhum pedido encontrado</h3>
@@ -285,7 +336,7 @@ export default function Orders() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedOrders.map((order) => (
+              {filteredOrders.map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-sm">
                     #{order.id}
@@ -297,7 +348,9 @@ export default function Orders() {
                     <div>
                       <div className="font-medium">
                         {order.buyer.first_name
-                          ? `${order.buyer.first_name} ${order.buyer.last_name || ""}`
+                          ? `${order.buyer.first_name} ${
+                              order.buyer.last_name || ""
+                            }`
                           : order.buyer.nickname}
                       </div>
                       <div className="text-xs text-muted-foreground">
@@ -307,10 +360,13 @@ export default function Orders() {
                   </TableCell>
                   <TableCell className="hidden md:table-cell max-w-[200px]">
                     <div className="truncate text-sm">
-                      {order.order_items.map((item) => item.item.title).join(", ")}
+                      {order.order_items
+                        .map((item) => item.item.title)
+                        .join(", ")}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {order.order_items.length} item{order.order_items.length !== 1 ? "s" : ""}
+                      {order.order_items.length} item
+                      {order.order_items.length !== 1 ? "s" : ""}
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">
@@ -341,7 +397,11 @@ export default function Orders() {
             <PaginationItem>
               <PaginationPrevious
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                className={
+                  currentPage === 1
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
               />
             </PaginationItem>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -369,8 +429,14 @@ export default function Orders() {
             })}
             <PaginationItem>
               <PaginationNext
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                className={
+                  currentPage === totalPages
+                    ? "pointer-events-none opacity-50"
+                    : "cursor-pointer"
+                }
               />
             </PaginationItem>
           </PaginationContent>
