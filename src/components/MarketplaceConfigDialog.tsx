@@ -262,6 +262,7 @@ export function MarketplaceConfigDialog({
         });
         setOauthStep("credentials");
         onSave({ ...formData, enabled: true });
+        onOpenChange(false);
       } else {
         setTestResult("error");
         throw new Error(result.message || "Falha na conexão");
@@ -419,7 +420,6 @@ export function MarketplaceConfigDialog({
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {oauthStep === "credentials" ? (
             <>
-              {/* Botão responsavel por avançar de tela, salvar configurações iniciais e avançar para etapa de configuração */}
               <Button
                 onClick={handleContinueConfig}
                 disabled={
@@ -442,7 +442,6 @@ export function MarketplaceConfigDialog({
               >
                 Voltar
               </Button>
-              {/* Botão responsavel por salvar as alterações e fechar o popup. Adicionar uma confirmação de que as alterações serão salvas. */}
               <Button
                 variant="outline"
                 onClick={confirmSaveCredentials}
@@ -456,7 +455,6 @@ export function MarketplaceConfigDialog({
               >
                 {isSaving ? "Salvando..." : "Salvar Credenciais"}
               </Button>
-              {/* Botão responsavel por realizar o teste de conexão. Deverá ficar desabilitado caso o código de autorização não tenha sido informado. Deverá ficar desabilitado caso o teste de conexão já tenha sido realizado com sucesso. Aviso de sucesso ou erro para feedback.*/}
               <Button
                 onClick={handleTestConnection}
                 disabled={
