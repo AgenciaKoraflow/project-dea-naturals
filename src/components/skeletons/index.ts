@@ -3,3 +3,5 @@ export { ReturnsSkeleton } from './ReturnsSkeleton';
 export { ReturnDetailSkeleton } from './ReturnDetailSkeleton';
 export { AnalyticsSkeleton } from './AnalyticsSkeleton';
 export { SettingsSkeleton } from './SettingsSkeleton';
+export { OrdersSkeleton } from './OrdersSkeleton';
+export { OrderDetailSkeleton } from './OrderDetailSkeleton';

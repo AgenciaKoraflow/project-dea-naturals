@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, Settings, Menu, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Package, Settings, Menu, TrendingUp, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Pedidos', href: '/pedidos', icon: ShoppingBag },
     { name: 'Devoluções', href: '/devolucoes', icon: Package },
     { name: 'Análises', href: '/analises', icon: TrendingUp },
     { name: 'Configurações', href: '/configuracoes', icon: Settings },
