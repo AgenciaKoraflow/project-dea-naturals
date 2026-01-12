@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase, Return } from '@/lib/supabase';
+import { CACHE_TIMES } from '@/lib/queryConfig';
 
 interface UseReturnsOptions {
   searchQuery?: string;
@@ -14,6 +15,7 @@ export function useReturns(options: UseReturnsOptions = {}) {
 
   return useQuery({
     queryKey: ['returns', searchQuery, status, marketplaceId, startDate, endDate],
+    ...CACHE_TIMES.DYNAMIC, // 2 minutos staleTime, 10 minutos gcTime
     queryFn: async () => {
       let query = supabase
         .from('returns')
@@ -56,6 +58,7 @@ export function useReturns(options: UseReturnsOptions = {}) {
 export function useReturn(id: string) {
   return useQuery({
     queryKey: ['return', id],
+    ...CACHE_TIMES.DYNAMIC, // 2 minutos staleTime, 10 minutos gcTime
     queryFn: async () => {
       const { data, error } = await supabase
         .from('returns')

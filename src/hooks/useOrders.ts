@@ -3,6 +3,7 @@ import {
   MercadoLivreOrdersResponse,
   OrdersFilters,
 } from "@/lib/mercadoLivreTypes";
+import { CACHE_TIMES } from "@/lib/queryConfig";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 /**
@@ -49,7 +50,7 @@ export function useOrders(filters: OrdersFilters = {}) {
   return useQuery<MercadoLivreOrdersResponse>({
     queryKey: ["orders", filters],
     queryFn: () => fetchOrders(filters),
-    staleTime: 1000 * 60 * 2, // 2 minutos - pedidos podem mudar frequentemente
+    ...CACHE_TIMES.DYNAMIC, // 2 minutos staleTime, 10 minutos gcTime
     retry: 2,
   });
 }
@@ -81,6 +82,6 @@ export function useOrder(orderId: number | string) {
       };
     },
     enabled: !!orderId,
-    staleTime: 1000 * 60 * 2,
+    ...CACHE_TIMES.DYNAMIC, // 2 minutos staleTime, 10 minutos gcTime
   });
 }

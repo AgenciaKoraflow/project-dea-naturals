@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import { CACHE_TIMES } from "@/lib/queryConfig";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -18,6 +19,7 @@ export function useMercadoLivreCredentials() {
 
   const { data, isLoading, error } = useQuery<MercadoLivreCredentials | null>({
     queryKey: ["mercadoLivreCredentials"],
+    ...CACHE_TIMES.SENSITIVE, // 5 minutos staleTime, 15 minutos gcTime
     queryFn: async () => {
       const response = await axios.get(
         `${API_URL}/api/mercadolibre/credentials`

@@ -9,6 +9,7 @@ import {
   MercadoLivreSearchResult,
   MercadoLivreCategory,
 } from "@/lib/mercadoLivreApi";
+import { CACHE_TIMES } from "@/lib/queryConfig";
 
 /**
  * Hook para buscar todos os sites disponíveis no Mercado Livre
@@ -17,7 +18,7 @@ export function useMercadoLivreSites() {
   return useQuery<MercadoLivreSite[]>({
     queryKey: ["mercado-livre", "sites"],
     queryFn: getSites,
-    staleTime: 1000 * 60 * 60, // 1 hora - sites mudam raramente
+    ...CACHE_TIMES.STATIC, // 24 horas staleTime, 48 horas gcTime
   });
 }
 
@@ -29,7 +30,7 @@ export function useMercadoLivreSite(siteId: string) {
     queryKey: ["mercado-livre", "site", siteId],
     queryFn: () => getSite(siteId),
     enabled: !!siteId,
-    staleTime: 1000 * 60 * 60, // 1 hora
+    ...CACHE_TIMES.STATIC, // 24 horas staleTime, 48 horas gcTime
   });
 }
 
@@ -46,7 +47,7 @@ export function useMercadoLivreSearch(
     queryKey: ["mercado-livre", "search", query, siteId, limit],
     queryFn: () => searchProducts(query, siteId, limit),
     enabled: enabled && !!query && query.length > 0,
-    staleTime: 1000 * 60 * 5, // 5 minutos - resultados de busca mudam frequentemente
+    ...CACHE_TIMES.FREQUENT, // 5 minutos staleTime, 15 minutos gcTime
   });
 }
 
@@ -58,7 +59,7 @@ export function useMercadoLivreCategories(siteId: string = "MLB") {
     queryKey: ["mercado-livre", "categories", siteId],
     queryFn: () => getCategories(siteId),
     enabled: !!siteId,
-    staleTime: 1000 * 60 * 60, // 1 hora - categorias mudam raramente
+    ...CACHE_TIMES.STATIC, // 24 horas staleTime, 48 horas gcTime
   });
 }
 
@@ -70,6 +71,6 @@ export function useMercadoLivreCategory(categoryId: string) {
     queryKey: ["mercado-livre", "category", categoryId],
     queryFn: () => getCategory(categoryId),
     enabled: !!categoryId,
-    staleTime: 1000 * 60 * 60, // 1 hora
+    ...CACHE_TIMES.STATIC, // 24 horas staleTime, 48 horas gcTime
   });
 }
