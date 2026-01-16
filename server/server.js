@@ -608,6 +608,37 @@ app.get("/api/mercadolibre/orders", async (req, res) => {
   }
 });
 
+// Endpoint para buscar um pedido específico por ID
+app.get("/api/mercadolibre/orders/:orderId", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return res.status(400).json({
+        message: "Order ID é obrigatório",
+      });
+    }
+
+    // Busca o pedido específico na API do MercadoLibre
+    const orderUrl = `https://api.mercadolibre.com/orders/${orderId}`;
+    const orderResponse = await makeRequestWithAutoRefresh(orderUrl);
+
+    res.json(orderResponse.data);
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json({
+        message: "Erro ao buscar pedido",
+        error: error.response.data,
+      });
+    } else {
+      res.status(500).json({
+        message: "Erro ao buscar pedido",
+        error: error.message,
+      });
+    }
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
