@@ -639,6 +639,85 @@ app.get("/api/mercadolibre/orders/:orderId", async (req, res) => {
   }
 });
 
+// Endpoint para buscar orders a partir do pack_id
+app.get("/api/mercadolibre/orders/by-pack/:packId", async (req, res) => {
+  try {
+    const { packId } = req.params;
+
+    if (!packId) {
+      return res.status(400).json({
+        message: "Pack ID é obrigatório",
+      });
+    }
+
+    // Busca informações do pack na API do MercadoLibre
+    const packUrl = `https://api.mercadolibre.com/packs/${packId}`;
+    const packResponse = await makeRequestWithAutoRefresh(packUrl);
+
+    // O pack contém informações sobre as orders associadas
+    // Retorna as informações do pack que incluem as orders
+    res.json(packResponse.data);
+  } catch (error) {
+    if (error.response) {
+      res.status(error.response.status).json({
+        message: "Erro ao buscar pack ou orders",
+        error: error.response.data,
+      });
+    } else {
+      res.status(500).json({
+        message: "Erro ao buscar pack ou orders",
+        error: error.message,
+      });
+    }
+  }
+});
+
+// Endpoint alternativo: busca uma order específica usando pack_id e order_id
+app.get(
+  "/api/mercadolibre/orders/by-pack/:packId/:orderId",
+  async (req, res) => {
+    try {
+      const { packId, orderId } = req.params;
+
+      if (!packId || !orderId) {
+        return res.status(400).json({
+          message: "Pack ID e Order ID são obrigatórios",
+        });
+      }
+
+      // Busca a order específica
+      const orderUrl = `https://api.mercadolibre.com/orders/${orderId}`;
+      const orderResponse = await makeRequestWithAutoRefresh(orderUrl);
+
+      const order = orderResponse.data;
+
+      // Valida se a order pertence ao pack_id informado
+      if (!order.pack_id || String(order.pack_id) !== String(packId)) {
+        return res.status(404).json({
+          message: "Order não pertence ao pack informado",
+          order_pack_id: order.pack_id,
+          requested_pack_id: packId,
+        });
+      }
+
+      // Se pertencer, retorna a order
+      res.json(order);
+    } catch (error) {
+      if (error.response) {
+        res.status(error.response.status).json({
+          message: "Erro ao buscar pedido",
+          error: error.response.data,
+        });
+      } else {
+        res.status(500).json({
+          message: "Erro ao buscar pedido",
+          error: error.message,
+        });
+      }
+    }
+  }
+);
+
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
